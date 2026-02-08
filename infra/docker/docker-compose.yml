@@ -1,0 +1,123 @@
+services:
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../../backend/promtail-config.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    privileged: true
+    networks:
+      - backend_network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ../../backend/loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - backend_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../../backend/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - backend_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - grafana_data:/var/lib/grafana
+    networks:
+      - backend_network
+
+  app:
+    container_name: backend
+    restart: always
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    command: uv run uvicorn src.main:app --host 0.0.0.0 --port 8080
+    volumes:
+      - ../../backend/src:/app/src
+      - ../../backend/media:/app/media
+      - ../../backend/src/static:/app/src/static
+    logging:
+      driver: json-file
+      options:
+        tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+    env_file: ../envs/.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - backend_network
+
+  db:
+    container_name: db
+    restart: always
+    image: postgres:15
+    env_file: ../envs/.env
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend_network
+
+  redis:
+    container_name: redis
+    restart: always
+    image: redis:alpine
+    env_file: ../envs/.env
+    ports:
+      - "6378:6379"
+    networks:
+      - backend_network
+
+  minio:
+    container_name: minio
+    restart: always
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    env_file: ../envs/.env
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - backend_network
+
+networks:
+  backend_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  grafana_data:
+  prometheus_data:
+  minio_data:
+  static:

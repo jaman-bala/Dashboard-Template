@@ -1,0 +1,62 @@
+stages:
+  - build
+  - lint_format
+  - migrations
+  - test
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+
+build-job:
+  stage: build
+  before_script:
+    - echo "$ENV" > .env
+    - echo "$TEST_ENV" > .env-test
+    - docker network create backend_network || true
+  script:
+    - docker build -t backend-api-image .
+
+Lint:
+  stage: lint_format
+  script:
+    - docker run --rm --network backend_network backend-api-image uv run ruff check
+
+Format:
+  stage: lint_format
+  script:
+    - docker run --rm --network backend_network backend-api-image uv run ruff format --check
+
+Migrations:
+  stage: migrations
+  script:
+    - docker run --rm --network backend_network backend-api-image uv run alembic upgrade head
+
+Test:
+  stage: test
+  services:
+    - postgres:15-alpine
+    - redis:alpine
+  variables:
+    POSTGRES_DB: test_db
+    POSTGRES_USER: test_user
+    POSTGRES_PASSWORD: test_password
+    POSTGRES_HOST: postgres
+    REDIS_HOST: redis
+    MODE: test
+  script:
+    - docker run --rm --network backend_network 
+      -e MODE=test 
+      -e POSTGRES_HOST=postgres 
+      -e REDIS_HOST=redis 
+      backend-api-image uv run pytest tests/ -v --tb=short
+  allow_failure: false
+
+deploy-job:
+  stage: deploy
+  only:
+    - main
+    - master
+  script:
+    - docker compose -f docker-compose.yml up -d
+
