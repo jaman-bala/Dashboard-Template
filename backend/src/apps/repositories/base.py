@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.repositories.mappers.base import DataMapper
 from src.apps.repositories.mappers.types import TModel, TDTO
 from src.core.exeptions import ObjectNotFoundException, SeveralObjectsFoundException
+from src.apps.services.cache_service import CacheService
 
 
 class BaseRepository(Generic[TModel, TDTO]):
@@ -17,8 +18,11 @@ class BaseRepository(Generic[TModel, TDTO]):
     model: Type[TModel]
     mapper: DataMapper
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, cache_service: CacheService | None = None
+    ) -> None:
         self.session = session
+        self._cache_service = cache_service
 
     # ---------- READ ----------
 
@@ -80,6 +84,12 @@ class BaseRepository(Generic[TModel, TDTO]):
         result = await self.session.execute(stmt)
         model = result.scalars().one()
 
+        # Инвалидируем кэш при добавлении
+        if self._cache_service:
+            await self._cache_service.delete_pattern(
+                f"{self.model.__tablename__.lower()}:list:*"
+            )
+
         return self.mapper.map_to_domain_entity(model)
 
     async def add_bulk(self, data: Sequence[TDTO]) -> None:
@@ -92,6 +102,12 @@ class BaseRepository(Generic[TModel, TDTO]):
 
         stmt = insert(self.model).values(payload)
         await self.session.execute(stmt)
+
+        # Инвалидируем кэш при массовом добавлении
+        if self._cache_service:
+            await self._cache_service.delete_pattern(
+                f"{self.model.__tablename__.lower()}:list:*"
+            )
 
     # ---------- UPDATE ----------
 
@@ -116,6 +132,12 @@ class BaseRepository(Generic[TModel, TDTO]):
         if len(rows) > 1:
             raise SeveralObjectsFoundException
 
+        # Инвалидируем кэш при обновлении
+        if self._cache_service:
+            await self._cache_service.delete_pattern(
+                f"{self.model.__tablename__.lower()}:list:*"
+            )
+
     async def update(self, data: TDTO, **filter_by: Any) -> None:
         payload = data.model_dump(
             exclude_unset=True,
@@ -136,3 +158,9 @@ class BaseRepository(Generic[TModel, TDTO]):
 
         if len(rows) > 1:
             raise SeveralObjectsFoundException
+
+        # Инвалидируем кэш при удалении
+        if self._cache_service:
+            await self._cache_service.delete_pattern(
+                f"{self.model.__tablename__.lower()}:list:*"
+            )

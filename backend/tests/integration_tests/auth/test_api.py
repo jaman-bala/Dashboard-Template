@@ -52,9 +52,9 @@ async def test_auth_flow(
         headers={"Authorization": f"Bearer {token}" if token else ""},
     )
 
-    assert resp_register.status_code == expected_status, (
-        f"Ошибка при регистрации: {resp_register.json()}"
-    )
+    assert (
+        resp_register.status_code == expected_status
+    ), f"Ошибка при регистрации: {resp_register.json()}"
 
     if resp_register.status_code != 200:
         return  # Если регистрация не удалась, выходим из теста
@@ -72,21 +72,21 @@ async def test_auth_flow(
 
     # Дополнительный шаг: Пробуем получить информацию о текущем пользователе
     resp_me = await ac.get("/auth/me")
-    assert resp_me.status_code == 200, (
-        f"Ошибка при получении данных пользователя: {resp_me.json()}"
-    )
+    assert (
+        resp_me.status_code == 200
+    ), f"Ошибка при получении данных пользователя: {resp_me.json()}"
 
     # Проверка, что информация о пользователе соответствует ожидаемой
     user = resp_me.json().get("data")
     assert user, "Информация о пользователе отсутствует."
     assert user["phone"] == phone, "Номер телефона не совпадает с ожидаемым."
     assert "id" in user, "Отсутствует поле 'id' в данных пользователя."
-    assert "password" not in user, (
-        "Поле 'password' не должно быть в данных пользователя."
-    )
-    assert "hashed_password" not in user, (
-        "Поле 'hashed_password' не должно быть в данных пользователя."
-    )
+    assert (
+        "password" not in user
+    ), "Поле 'password' не должно быть в данных пользователя."
+    assert (
+        "hashed_password" not in user
+    ), "Поле 'hashed_password' не должно быть в данных пользователя."
 
     # Шаг 4: Логаут
     resp_logout = await ac.delete("/auth/logout")

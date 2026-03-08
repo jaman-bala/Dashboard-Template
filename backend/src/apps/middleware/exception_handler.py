@@ -37,14 +37,27 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
                 )
             elif http_exception.status_code == 409:
                 # Conflict - дубликаты и другие нарушения целостности
-                return JSONResponse(
-                    status_code=409,
-                    content={
-                        "error": "Conflict",
-                        "message": http_exception.detail,
-                        "details": None,
-                    },
-                )
+                # Используем детальную информацию из исключения если она есть
+                http_exception.detail
+                if (
+                    isinstance(http_exception.detail, dict)
+                    and "field" in http_exception.detail
+                ):
+                    # Новый формат с указанием поля
+                    return JSONResponse(
+                        status_code=409,
+                        content=http_exception.detail,
+                    )
+                else:
+                    # Старый формат для обратной совместимости
+                    return JSONResponse(
+                        status_code=409,
+                        content={
+                            "error": "Conflict",
+                            "message": http_exception.detail,
+                            "details": None,
+                        },
+                    )
             else:
                 # Все остальные ошибки
                 return JSONResponse(

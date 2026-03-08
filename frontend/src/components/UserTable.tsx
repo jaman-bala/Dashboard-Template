@@ -22,18 +22,18 @@ export const UserTable: React.FC<UserTableProps> = ({
 }) => {
   const formatLastLogin = (date?: Date) => {
     if (!date) return 'Никогда';
-    
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMinutes / 60);
     const diffDays = Math.floor(diffHours / 24);
-    
+
     if (diffMinutes < 1) return 'Только что';
     if (diffMinutes < 60) return `${diffMinutes} мин назад`;
     if (diffHours < 24) return `${diffHours} ч назад`;
     if (diffDays < 7) return `${diffDays} дн назад`;
-    
+
     return date.toLocaleDateString('ru-RU');
   };
 
@@ -77,14 +77,14 @@ export const UserTable: React.FC<UserTableProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {users.map((user) => (
-              <tr key={user.id} 
-                  className="group hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 
+              <tr key={user.id}
+                  className="group hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50
                            transition-all duration-200">
                 {/* User Info */}
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500 
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500
                                     shadow-md ring-2 ring-white">
                         {user.avatar ? (
                           <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -142,7 +142,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                                     ${user.isActive ? 'text-green-600' : 'text-gray-500'}`}>
                       {user.isActive ? 'Активен' : 'Неактивен'}
                     </span>
-                    {user.isActive ? 
+                    {user.isActive ?
                       <UserCheck className="w-3 h-3 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity" /> :
                       <UserX className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                     }

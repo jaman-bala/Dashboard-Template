@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from typing import Any
 from pydantic import BaseModel, Field, ConfigDict
@@ -23,6 +25,8 @@ class UserBaseDTO(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         frozen=True,
+        str_strip_whitespace=True,
+        validate_assignment=True,
     )
 
 
@@ -38,7 +42,7 @@ class UserRequestAddDTO(BaseModel):
     phone: PhoneNumber = Field(..., description="Телефон пользователя")
     password: PasswordStr = Field(..., description="Пароль пользователя")
     photo: str | None = Field(None, description="Фото пользователя")
-    roles: str = Field(default=Role.USER, description="Роль пользователя")
+    roles: Role = Field(default=Role.USER, description="Роль пользователя")
 
 
 class UserUpdateRequestDTO(BaseModel):
@@ -68,14 +72,19 @@ class UserAddDTO(BaseModel):
     phone: PhoneNumber
     hashed_password: str = Field(min_length=1, max_length=200)
     photo: str | None = None
-    roles: str | None = None
+    roles: Role | None = None
     is_active: bool = True
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
 
 
 class UserResponseDTO(BaseModel):
     """DTO для ответа API с данными пользователя"""
+
     id: uuid.UUID
     first_name: NonEmptyString | None = None
     last_name: NonEmptyString | None = None
@@ -83,12 +92,16 @@ class UserResponseDTO(BaseModel):
     email: EmailField | None = None
     phone: PhoneNumber
     photo: str | None = None
-    roles: str
+    roles: Role
     is_active: bool
     last_login_iso: str | None = None
     exit_login_iso: str | None = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+    )
 
 
 class UserLogoutResponseDTO(UserBaseDTO):
@@ -109,9 +122,36 @@ class UserRequestUpdatePasswordDTO(BaseModel):
     change_password: PasswordStr | None = None
 
 
+class ChangePasswordResponseDTO(BaseModel):
+    message: str
+
+
 class RefreshTokenRequestDTO(BaseModel):
     refresh_token: str = Field(min_length=1, max_length=500)
+
+
+class RefreshTokenResponseDTO(BaseModel):
+    status: str
+    access_token: str
+
 
 class TokenResponseDTO(BaseModel):
     access_token: str
     last_login: str
+
+
+class GenerateTokenResponseDTO(BaseModel):
+    access_token: str
+    refresh_token: str
+
+
+class DeleteResponseDTO(BaseModel):
+    message: str
+
+
+class LogoutResponseDTO(BaseModel):
+    message: str
+
+
+class MinioSetupResponseDTO(BaseModel):
+    message: str

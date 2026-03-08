@@ -120,8 +120,24 @@ class ExceptionMapper:
             status_code = mapping["status_code"]
             detail = mapping["detail"]
 
+            # Добавляем информацию о поле для ошибок уникальности
+            if exception_type in [
+                PhoneAlreadyExistsException,
+                EmailAlreadyExistsException,
+            ]:
+                field_name = (
+                    "phone"
+                    if exception_type == PhoneAlreadyExistsException
+                    else "email"
+                )
+                detail = {
+                    "error": mapping["detail"],
+                    "field": field_name,
+                    "message": mapping["detail"],
+                }
+
             # Используем сообщение из исключения если оно есть
-            if hasattr(exception, "detail") and exception.detail:
+            elif hasattr(exception, "detail") and exception.detail:
                 detail = exception.detail
             elif hasattr(exception, "args") and exception.args:
                 detail = str(exception.args[0])

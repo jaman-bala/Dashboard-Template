@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from typing import Any
@@ -8,8 +10,18 @@ from sqlalchemy import func, TIMESTAMP, UUID
 
 from src.core.config import settings
 
-engine = create_async_engine(settings.DB_URL)
-engine_null_pool = create_async_engine(settings.DB_URL, poolclass=NullPool)
+engine = create_async_engine(
+    settings.DB_URL,
+    pool_size=20,
+    max_overflow=30,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    echo=settings.MODE == "DEV",
+)
+
+engine_null_pool = create_async_engine(
+    settings.DB_URL, poolclass=NullPool, echo=settings.MODE == "DEV"
+)
 
 async_session_maker = async_sessionmaker(bind=engine, expire_on_commit=False)
 async_session_maker_null_pool = async_sessionmaker(

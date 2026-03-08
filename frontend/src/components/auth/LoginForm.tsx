@@ -25,7 +25,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       const response = await apiService.login(formData);
       const user = await apiService.getCurrentUser();
       onLogin(user);
-      
+
       // Проверяем роль пользователя
       const isAdmin = user.roles.some(role => role.value === 'ADMIN');
       if (isAdmin) {

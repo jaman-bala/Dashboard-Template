@@ -45,10 +45,10 @@ Test:
     REDIS_HOST: redis
     MODE: test
   script:
-    - docker run --rm --network backend_network 
-      -e MODE=test 
-      -e POSTGRES_HOST=postgres 
-      -e REDIS_HOST=redis 
+    - docker run --rm --network backend_network
+      -e MODE=test
+      -e POSTGRES_HOST=postgres
+      -e REDIS_HOST=redis
       backend-api-image uv run pytest tests/ -v --tb=short
   allow_failure: false
 
@@ -59,4 +59,3 @@ deploy-job:
     - master
   script:
     - docker compose -f docker-compose.yml up -d
-

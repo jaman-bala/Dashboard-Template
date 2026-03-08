@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import uuid
 import logging
 from datetime import datetime
+
 
 from passlib.context import CryptContext
 
@@ -20,10 +23,11 @@ from src.apps.dto.users import (
     UserRequestLoginDTO,
     UserRequestUpdatePasswordDTO,
     TokenResponseDTO,
+    GenerateTokenResponseDTO,
 )
-from src.apps.models.role import Role
 from src.apps.services.base import BaseService
 from src.apps.services.token_service import TokenService
+from src.core.pagination import PaginationParams, PaginatedResponse
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +68,7 @@ class AuthService(BaseService):
 
     # ----------------- AUTHENTICATION -----------------
 
-    async def login_user(self, data: UserRequestLoginDTO) -> dict:
+    async def login_user(self, data: UserRequestLoginDTO) -> TokenResponseDTO:
         """Вход пользователя"""
         user = await self._authenticate_user(data)
 
@@ -76,7 +80,7 @@ class AuthService(BaseService):
         await self._log_audit_event(user, "login")
 
         return TokenResponseDTO(
-            access_token=tokens["access_token"],
+            access_token=tokens.access_token,
             last_login=datetime.utcnow().isoformat(),
         )
 
@@ -84,8 +88,10 @@ class AuthService(BaseService):
         self, access_token: str = None, user_id: str | uuid.UUID = None
     ) -> None:
         """Выход пользователя"""
-        logger.info(f"Logout attempt - access_token: {bool(access_token)}, user_id: {user_id}")
-        
+        logger.info(
+            f"Logout attempt - access_token: {bool(access_token)}, user_id: {user_id}"
+        )
+
         await self._token_service.logout_user(access_token, user_id)
 
         if user_id:
@@ -123,12 +129,29 @@ class AuthService(BaseService):
         """Получение текущего пользователя"""
         return await self.get_user_by_id(user_id)
 
-    async def get_all_users(self) -> list[UserResponseDTO]:
-        """Получение всех пользователей"""
-        users = await self.db.users.get_all()
-        if not users:
-            raise UserNotFoundException
-        return [self._map_user_to_response(user) for user in users]
+    async def get_all_users(
+        self, pagination: PaginationParams | None = None
+    ) -> PaginatedResponse[UserResponseDTO] | list[UserResponseDTO]:
+        """Получение всех пользователей с пагинацией или списком"""
+        if pagination:
+            users, total = await self.db.users.get_users_paginated(pagination)
+            if not users:
+                raise UserNotFoundException
+
+            return PaginatedResponse[UserResponseDTO](
+                items=[self._map_user_to_response(user) for user in users],
+                total=total,
+                page=pagination.page,
+                size=pagination.size,
+                pages=(total + pagination.size - 1) // pagination.size
+                if total > 0
+                else 0,
+            )
+        else:
+            users = await self.db.users.get_users()
+            if not users:
+                raise UserNotFoundException
+            return [self._map_user_to_response(user) for user in users]
 
     async def patch_user(
         self, user_id: uuid.UUID, data: UserUpdateRequestDTO
@@ -137,7 +160,9 @@ class AuthService(BaseService):
         await self._ensure_user_exists(user_id)
         await self.db.users.update(data, id=user_id)
         await self.db.commit()
-        return self._map_user_to_response(await self.db.users.get_one_or_none(id=user_id))
+        return self._map_user_to_response(
+            await self.db.users.get_one_or_none(id=user_id)
+        )
 
     async def delete_user(self, user_id: uuid.UUID) -> None:
         """Удаление пользователя"""
@@ -172,7 +197,9 @@ class AuthService(BaseService):
             await self.db.users.update(patch_data, id=user_id)
             await self.db.commit()
 
-        return self._map_user_to_response(await self.db.users.get_one_or_none(id=user_id))
+        return self._map_user_to_response(
+            await self.db.users.get_one_or_none(id=user_id)
+        )
 
     # ----------------- PRIVATE METHODS -----------------
 
@@ -187,15 +214,15 @@ class AuthService(BaseService):
 
         return user
 
-    async def _generate_tokens(self, user) -> dict:
+    async def _generate_tokens(self, user) -> GenerateTokenResponseDTO:
         """Генерация токенов для пользователя"""
         roles_list = self._extract_roles(user.roles)
         access_token = await self.create_access_token(user.id, roles_list)
         refresh_token = await self.create_refresh_token(user.id, roles_list)
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-        }
+        return GenerateTokenResponseDTO(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
 
     async def _ensure_user_exists(self, user_id: uuid.UUID):
         """Проверка существования пользователя"""
@@ -257,19 +284,19 @@ class AuthService(BaseService):
     def _map_user_to_response(self, user: UserBaseDTO) -> UserResponseDTO:
         last_login_iso = None
         exit_login_iso = None
-        
+
         if user.other_data:
             try:
                 last_login_str = user.other_data.get("last_login")
                 if last_login_str:
                     last_login_iso = datetime.fromisoformat(last_login_str).isoformat()
-                
+
                 exit_login_str = user.other_data.get("exit_login")
                 if exit_login_str:
                     exit_login_iso = datetime.fromisoformat(exit_login_str).isoformat()
             except (ValueError, TypeError):
-                pass  # Ошибки парсинга игнорируем, оставляем None
-        
+                pass
+
         return UserResponseDTO(
             id=user.id,
             first_name=user.first_name,
@@ -278,10 +305,10 @@ class AuthService(BaseService):
             email=user.email,
             phone=user.phone,
             photo=user.photo,
-            roles=user.roles.value if isinstance(user.roles, Role) else user.roles,
+            roles=user.roles,
             is_active=user.is_active,
             last_login_iso=last_login_iso,
-            exit_login_iso=exit_login_iso
+            exit_login_iso=exit_login_iso,
         )
 
     def _extract_roles(self, roles: str | list) -> list[str]:

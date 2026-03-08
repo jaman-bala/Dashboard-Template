@@ -18,7 +18,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
     new: '',
     confirm: ''
   });
-  
+
   const [showPasswords, setShowPasswords] = useState({
     new: false,
     confirm: false
@@ -28,17 +28,17 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newErrors: string[] = [];
-    
+
     if (passwords.new.length < 6) {
       newErrors.push('Новый пароль должен содержать минимум 6 символов');
     }
-    
+
     if (passwords.new !== passwords.confirm) {
       newErrors.push('Пароли не совпадают');
     }
-    
+
 
     setErrors(newErrors);
 
@@ -78,7 +78,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
             </div>
             <button
               onClick={handleClose}
-              className="p-2 text-white/80 hover:text-white hover:bg-white/10 
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10
                        rounded-xl transition-all duration-200"
             >
               <X className="h-5 w-5" />

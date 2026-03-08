@@ -167,27 +167,48 @@ class ApiClient {
   }
 
   async createUser(userData: CreateUserRequest): Promise<UserResponse> {
-    const formData = new FormData();
+    // Если есть фото, используем FormData, иначе JSON
+    if (userData.photo) {
+      const formData = new FormData();
 
-    // Добавляем поля в FormData
-    if (userData.first_name) formData.append('first_name', userData.first_name);
-    if (userData.last_name) formData.append('last_name', userData.last_name);
-    if (userData.middle_name) formData.append('middle_name', userData.middle_name);
-    if (userData.email) formData.append('email', userData.email);
-    formData.append('phone', userData.phone);
-    formData.append('password', userData.password);
-    if (userData.photo) formData.append('photo', userData.photo);
-    if (userData.roles) {
-      userData.roles.forEach(role => formData.append('roles', role));
+      // Добавляем текстовые поля
+      if (userData.first_name) formData.append('first_name', userData.first_name);
+      if (userData.last_name) formData.append('last_name', userData.last_name);
+      if (userData.middle_name) formData.append('middle_name', userData.middle_name);
+      if (userData.email) formData.append('email', userData.email);
+      formData.append('phone', userData.phone);
+      formData.append('password', userData.password);
+      formData.append('photo', userData.photo);
+      if (userData.roles) {
+        if (Array.isArray(userData.roles)) {
+          formData.append('roles', userData.roles[0] || 'USER');
+        } else {
+          formData.append('roles', userData.roles || 'USER');
+        }
+      }
+      formData.append('is_active', String(userData.is_active ?? true));
+
+      const response: AxiosResponse<{ message: string; data: UserResponse }> = await this.client.post('/auth/create', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data.data;
+    } else {
+      // Отправляем как JSON если нет фото
+      const jsonUserData = {
+        ...userData,
+        roles: Array.isArray(userData.roles) ? userData.roles[0] || 'USER' : userData.roles,
+        is_active: userData.is_active ?? true,
+      };
+
+      const response: AxiosResponse<{ message: string; data: UserResponse }> = await this.client.post('/auth/create', jsonUserData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data.data;
     }
-    formData.append('is_active', String(userData.is_active ?? true));
-
-    const response: AxiosResponse<{ message: string; data: UserResponse }> = await this.client.post('/auth/create', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.data;
   }
 
   async updateUser(userId: string, userData: UpdateUserRequest): Promise<UserResponse> {
@@ -229,7 +250,6 @@ class ApiClient {
     return this.token;
   }
 }
-
 // Создаем единственный экземпляр API клиента
 export const apiClient = new ApiClient();
 export default apiClient;

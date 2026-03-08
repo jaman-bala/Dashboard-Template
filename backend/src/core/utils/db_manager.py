@@ -1,5 +1,7 @@
 from src.apps.repositories.statements import StatementsRepository
 from src.apps.repositories.users import UsersRepository
+from src.apps.services.cache_service import CacheServiceFactory
+from src.core.init import redis_manager
 
 
 class DBManager:
@@ -9,7 +11,9 @@ class DBManager:
     async def __aenter__(self):
         self.session = self.session_factory()
 
-        self.users = UsersRepository(self.session)
+        cache_service = CacheServiceFactory.create_redis_cache(redis_manager)
+
+        self.users = UsersRepository(self.session, cache_service)
         self.statements = StatementsRepository(self.session)
 
         return self

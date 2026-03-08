@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  Settings, 
-  BarChart3, 
-  Shield, 
-  Bell, 
-  HelpCircle, 
+import {
+  Users,
+  Settings,
+  BarChart3,
+  Shield,
+  Bell,
+  HelpCircle,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -58,21 +58,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`
           w-full flex items-center px-3 py-3 rounded-xl text-left
           transition-all duration-300 ease-out group relative
-          ${isActive 
-            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105' 
+          ${isActive
+            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg transform scale-105'
             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
           }
           ${isCollapsed ? 'justify-center' : 'justify-start'}
         `}
       >
         <div className={`
-          flex items-center justify-center w-6 h-6 
+          flex items-center justify-center w-6 h-6
           transition-transform duration-300
           ${isActive ? 'scale-110' : isHovered ? 'scale-105' : 'scale-100'}
         `}>
           <Icon className="w-5 h-5" />
         </div>
-        
+
         <span className={`
           ml-3 font-medium transition-all duration-300
           ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}
@@ -87,11 +87,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Tooltip for collapsed state */}
         {isCollapsed && isHovered && (
-          <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm 
+          <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm
                          rounded-lg shadow-lg z-50 whitespace-nowrap
                          transform transition-all duration-200 ease-out">
             {item.label}
-            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1 
+            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1
                            w-2 h-2 bg-gray-900 rotate-45" />
           </div>
         )}
@@ -111,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flex items-center space-x-3 transition-all duration-300
           ${isCollapsed ? 'opacity-0 w-0' : 'opacity-100 w-auto'}
         `}>
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500
                          rounded-xl flex items-center justify-center shadow-lg">
             <UserCog className="w-6 h-6 text-white" />
           </div>
@@ -120,10 +120,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-xs text-gray-500">Admin Dashboard</p>
           </div>
         </div>
-        
+
         <button
           onClick={onToggle}
-          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100
                    rounded-lg transition-all duration-200 transform hover:scale-105"
         >
           {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {bottomItems.map((item) => (
             <MenuItem key={item.id} item={item} isBottom />
           ))}
-          
+
           {/* Logout Button */}
           <button
             className={`
@@ -171,12 +171,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ${isCollapsed ? 'px-2' : 'px-4'}
         `}>
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500 
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-500
                            shadow-md ring-2 ring-white flex-shrink-0">
-              <img 
-                src="https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150" 
-                alt="Admin" 
-                className="w-full h-full object-cover" 
+              <img
+                src="https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150"
+                alt="Admin"
+                className="w-full h-full object-cover"
               />
             </div>
             <div className={`

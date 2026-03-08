@@ -1,5 +1,3 @@
-"""Кастомные типы для валидации"""
-
 from typing import Annotated, Optional
 from pydantic import StringConstraints, AfterValidator, Field, EmailStr
 from src.core.config import settings
@@ -12,8 +10,6 @@ def validate_phone_logic(v: str) -> str:
         raise ValueError("Phone number is required")
 
     v = v.strip()
-
-    # Проверяем через regex из настроек
     if not re.match(settings.PHONE_REGEX_PATTERN, v):
         raise ValueError("Invalid phone number format")
 
@@ -25,11 +21,9 @@ def validate_password_strength(v: str) -> str:
     if not v:
         raise ValueError("Password is required")
 
-    # Проверяем длину
     if not (8 <= len(v) <= 72):
         raise ValueError("Password length must be between 8 and 72 characters")
 
-    # Проверяем наличие заглавных, строчных букв и цифр программно
     has_upper = any(c.isupper() for c in v)
     has_lower = any(c.islower() for c in v)
     has_digit = any(c.isdigit() for c in v)
@@ -38,8 +32,6 @@ def validate_password_strength(v: str) -> str:
         raise ValueError(
             "Password must contain at least one uppercase letter, one lowercase letter, and one number"
         )
-
-    # Проверяем базовый паттерн
     if not re.match(settings.PASSWORD_REGEX_PATTERN, v):
         raise ValueError("Password contains invalid characters")
 
@@ -51,7 +43,7 @@ def validate_non_empty_string(v: Optional[str]) -> Optional[str]:
     if v is not None:
         v = v.strip()
         if v == "":
-            raise ValueError("Field cannot be an empty string")
+            return None
     return v
 
 

@@ -9,6 +9,10 @@ interface UserModalProps {
   onSave: (userData: UserFormData) => void;
   user?: User | null;
   mode: 'add' | 'edit' | 'view';
+  fieldErrors?: {
+    email?: string;
+    phone?: string;
+  };
 }
 
 export const UserModal: React.FC<UserModalProps> = ({
@@ -16,7 +20,8 @@ export const UserModal: React.FC<UserModalProps> = ({
   onClose,
   onSave,
   user,
-  mode
+  mode,
+  fieldErrors = {}
 }) => {
   const [formData, setFormData] = useState<UserFormData>({
     first_name: '',
@@ -62,6 +67,17 @@ export const UserModal: React.FC<UserModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
+    setFormData({
+      first_name: '',
+      last_name: '',
+      middle_name: '',
+      email: '',
+      phone: '',
+      roles: ['USER'],
+      is_active: true,
+      password: ''
+    });
+    setAvatar('');
     onClose();
   };
 
@@ -74,7 +90,7 @@ export const UserModal: React.FC<UserModalProps> = ({
     if (file) {
       // Сохраняем файл в formData
       setFormData(prev => ({ ...prev, photo: file }));
-      
+
       // Создаем preview для отображения
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -87,8 +103,8 @@ export const UserModal: React.FC<UserModalProps> = ({
   if (!isOpen) return null;
 
   const isReadonly = mode === 'view';
-  const title = mode === 'add' ? 'Добавить пользователя' : 
-                mode === 'edit' ? 'Редактировать пользователя' : 
+  const title = mode === 'add' ? 'Добавить пользователя' :
+                mode === 'edit' ? 'Редактировать пользователя' :
                 'Информация о пользователе';
 
   return (
@@ -101,7 +117,7 @@ export const UserModal: React.FC<UserModalProps> = ({
             <h2 className="text-xl font-semibold text-white">{title}</h2>
             <button
               onClick={onClose}
-              className="p-2 text-white/80 hover:text-white hover:bg-white/10 
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10
                        rounded-xl transition-all duration-200"
             >
               <X className="h-5 w-5" />
@@ -125,7 +141,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                   )}
                 </div>
                 {!isReadonly && (
-                  <label className="absolute bottom-0 right-0 bg-blue-500 hover:bg-blue-600 
+                  <label className="absolute bottom-0 right-0 bg-blue-500 hover:bg-blue-600
                                  text-white rounded-full p-2 cursor-pointer shadow-lg
                                  transition-all duration-200 transform hover:scale-105">
                     <Upload className="w-4 h-4" />
@@ -200,12 +216,18 @@ export const UserModal: React.FC<UserModalProps> = ({
                   type="email"
                   disabled={isReadonly}
                   value={formData.email || ''}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl
+                  onChange={(e) => {
+                    handleInputChange('email', e.target.value);
+                  }}
+                  className={`w-full px-4 py-3 border rounded-xl
                            focus:ring-2 focus:ring-blue-500 focus:border-transparent
                            disabled:bg-gray-50 disabled:text-gray-500
-                           transition-all duration-200"
+                           transition-all duration-200
+                           ${fieldErrors.email ? 'border-red-500 focus:ring-red-500' : 'border-gray-200'}`}
                 />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div>
@@ -217,12 +239,18 @@ export const UserModal: React.FC<UserModalProps> = ({
                   required
                   disabled={isReadonly}
                   value={formData.phone || ''}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl
+                  onChange={(e) => {
+                    handleInputChange('phone', e.target.value);
+                  }}
+                  className={`w-full px-4 py-3 border rounded-xl
                            focus:ring-2 focus:ring-blue-500 focus:border-transparent
                            disabled:bg-gray-50 disabled:text-gray-500
-                           transition-all duration-200"
+                           transition-all duration-200
+                           ${fieldErrors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-200'}`}
                 />
+                {fieldErrors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.phone}</p>
+                )}
               </div>
 
               <div>

@@ -44,9 +44,7 @@ def get_token(request: Request) -> str:
     return token
 
 
-async def get_current_user_id(
-    db: DBDep, token: str = Depends(get_token)
-) -> uuid.UUID:
+async def get_current_user_id(db: DBDep, token: str = Depends(get_token)) -> uuid.UUID:
     try:
         # Создаем временный AuthService для декодирования токена
         auth_service = AuthService(db)
@@ -58,9 +56,7 @@ async def get_current_user_id(
         raise HTTPException(status_code=401, detail="Invalid user ID format")
 
 
-async def get_current_is_superuser(
-    db: DBDep, token: str = Depends(get_token)
-) -> bool:
+async def get_current_is_superuser(db: DBDep, token: str = Depends(get_token)) -> bool:
     try:
         auth_service = AuthService(db)
         data = await auth_service.decode_access_token(token)
@@ -69,9 +65,7 @@ async def get_current_is_superuser(
         raise HTTPException(status_code=401, detail="Incorrect access token")
 
 
-async def get_current_admin(
-    db: DBDep, token: str = Depends(get_token)
-) -> bool:
+async def get_current_admin(db: DBDep, token: str = Depends(get_token)) -> bool:
     try:
         auth_service = AuthService(db)
         data = await auth_service.decode_access_token(token)
@@ -80,9 +74,7 @@ async def get_current_admin(
         raise HTTPException(status_code=401, detail="Incorrect access token")
 
 
-async def get_current_user(
-    db: DBDep, token: str = Depends(get_token)
-) -> dict:
+async def get_current_user(db: DBDep, token: str = Depends(get_token)) -> dict:
     try:
         auth_service = AuthService(db)
         data = await auth_service.decode_access_token(token)

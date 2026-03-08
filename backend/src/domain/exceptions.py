@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 """Доменные исключения - независимые от транспортного слоя"""
 
 
 class DomainException(Exception):
     """Базовое доменное исключение"""
 
-    def __init__(self, message: str, *args, **kwargs):
+    def __init__(self, message: str, error_code: str | None = None, *args, **kwargs):
         self.message = message
+        self.error_code = error_code
         super().__init__(message, *args, **kwargs)
 
 
@@ -17,27 +20,32 @@ class UserDomainException(DomainException):
 
 class UserNotFoundException(UserDomainException):
     def __init__(self):
-        super().__init__("Пользователь не найден")
+        super().__init__("Пользователь не найден", "USER_NOT_FOUND")
 
 
 class UserAlreadyExistsException(UserDomainException):
     def __init__(self):
-        super().__init__("Пользователь уже существует")
+        super().__init__("Пользователь уже существует", "USER_ALREADY_EXISTS")
 
 
 class EmailAlreadyExistsException(UserDomainException):
     def __init__(self):
-        super().__init__("Пользователь с таким email уже существует")
+        super().__init__(
+            "Пользователь с таким email уже существует", "EMAIL_ALREADY_EXISTS"
+        )
 
 
 class PhoneAlreadyExistsException(UserDomainException):
     def __init__(self):
-        super().__init__("Пользователь с таким номером телефона уже существует")
+        super().__init__(
+            "Пользователь с таким номером телефона уже существует",
+            "PHONE_ALREADY_EXISTS",
+        )
 
 
 class IncorrectPasswordException(UserDomainException):
     def __init__(self):
-        super().__init__("Неверный пароль")
+        super().__init__("Неверный пароль", "INCORRECT_PASSWORD")
 
 
 class AuthenticationException(DomainException):
@@ -48,17 +56,17 @@ class AuthenticationException(DomainException):
 
 class InvalidTokenException(AuthenticationException):
     def __init__(self):
-        super().__init__("Неверный токен")
+        super().__init__("Неверный токен", "INVALID_TOKEN")
 
 
 class TokenValidationException(AuthenticationException):
     def __init__(self):
-        super().__init__("Ошибка валидации токена")
+        super().__init__("Ошибка валидации токена", "TOKEN_VALIDATION_ERROR")
 
 
 class ExpiredTokenException(AuthenticationException):
     def __init__(self):
-        super().__init__("Срок действия токена истек")
+        super().__init__("Срок действия токена истек", "TOKEN_EXPIRED")
 
 
 class DataValidationException(DomainException):

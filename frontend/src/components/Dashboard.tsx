@@ -6,6 +6,7 @@ import { SearchBar } from './SearchBar';
 import { UserTable } from './UserTable';
 import { UserModal } from './UserModal';
 import { PasswordModal } from './PasswordModal';
+import { ErrorModal } from './ErrorModal';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
@@ -20,7 +21,7 @@ export const Dashboard: React.FC = () => {
   const [activeMenuItem, setActiveMenuItem] = useState('users');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { user: currentUser, logout } = useAuth();
 
   // Загружаем пользователей при монтировании компонента
@@ -41,24 +42,28 @@ export const Dashboard: React.FC = () => {
       const usersData = await apiClient.getAllUsers();
       setUsers(usersData);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка загрузки пользователей');
-      console.error('Failed to load users:', err);
+      showError(err.response?.data?.detail || 'Ошибка загрузки пользователей', 'error', 'Ошибка загрузки');
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   // Modal states
   const [userModal, setUserModal] = useState<{
     isOpen: boolean;
     mode: 'add' | 'edit' | 'view';
     user?: User | null;
+    fieldErrors?: {
+      email?: string;
+      phone?: string;
+    };
   }>({
     isOpen: false,
     mode: 'add',
-    user: null
+    user: null,
+    fieldErrors: {}
   });
-  
+
   const [passwordModal, setPasswordModal] = useState<{
     isOpen: boolean;
     user?: User | null;
@@ -67,20 +72,33 @@ export const Dashboard: React.FC = () => {
     user: null
   });
 
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type?: 'error' | 'warning' | 'info';
+    fieldErrors?: { [key: string]: string };
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'error',
+    fieldErrors: {}
+  });
+
   // Filtered users
   const filteredUsers = useMemo(() => {
     return displayUsers.filter(user => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.middleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.phone.includes(searchTerm);
-      
+
       const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-      const matchesStatus = selectedStatus === 'all' || 
+      const matchesStatus = selectedStatus === 'all' ||
         (selectedStatus === 'active' && user.isActive) ||
         (selectedStatus === 'inactive' && !user.isActive);
-      
+
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [displayUsers, searchTerm, selectedRole, selectedStatus]);
@@ -91,7 +109,7 @@ export const Dashboard: React.FC = () => {
     const active = displayUsers.filter(u => u.isActive).length;
     const inactive = total - active;
     const admins = displayUsers.filter(u => u.role === 'ADMIN' || u.role === 'SUPERUSER').length;
-    
+
     return { total, active, inactive, admins };
   }, [displayUsers]);
 
@@ -116,7 +134,7 @@ export const Dashboard: React.FC = () => {
         await apiClient.deleteUser(user.id);
         await loadUsers(); // Перезагружаем список пользователей
       } catch (err: any) {
-        setError(err.response?.data?.detail || 'Ошибка удаления пользователя');
+        showError(err.response?.data?.detail || 'Ошибка удаления пользователя', 'error', 'Ошибка удаления');
       }
     }
   };
@@ -134,7 +152,7 @@ export const Dashboard: React.FC = () => {
         await loadUsers(); // Перезагружаем список пользователей
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка изменения статуса пользователя');
+      showError(err.response?.data?.detail || 'Ошибка изменения статуса пользователя', 'error', 'Ошибка изменения статуса');
     }
   };
 
@@ -150,16 +168,15 @@ export const Dashboard: React.FC = () => {
           try {
             await apiClient.updateUserAvatar(userModal.user.id, userData.photo);
           } catch (avatarError: any) {
-            console.error('Avatar update error:', avatarError);
-            if (avatarError.response?.data?.detail) {
-              setError(`Ошибка обновления аватара: ${avatarError.response.data.detail}`);
-            } else {
-              setError('Ошибка обновления аватара');
-            }
+            showError(
+              avatarError.response?.data?.detail || 'Ошибка обновления аватара',
+              'error',
+              'Ошибка обновления аватара'
+            );
             return; // Прерываем выполнение, если аватар не обновился
           }
         }
-        
+
         // Обновляем остальные данные пользователя
         const updateRequest = formDataToUpdateRequest(userData);
         await apiClient.updateUser(userModal.user.id, updateRequest);
@@ -167,37 +184,128 @@ export const Dashboard: React.FC = () => {
       }
       closeUserModal();
     } catch (err: any) {
-      console.error('Error saving user:', err);
-      if (err.response?.data?.detail) {
-        if (Array.isArray(err.response.data.detail)) {
-          // Если это массив ошибок валидации
-          const errorMessages = err.response.data.detail.map((error: any) => error.msg).join(', ');
-          setError(`Ошибка валидации: ${errorMessages}`);
-        } else {
-          // Проверяем, не является ли detail названием класса исключения
-          const detail = err.response.data.detail;
-          if (detail.includes('Exception') || detail.includes('Error')) {
-            setError('Произошла ошибка при сохранении пользователя');
+      // Специальная обработка ошибок уникальности
+      if (err.response?.status === 409) {
+        const responseData = err.response.data;
+
+        // Проверяем новую структуру ответа с полем
+        if (responseData && typeof responseData === 'object' && responseData.field) {
+          if (responseData.field === 'phone') {
+            showError(
+              'Пользователь с таким номером телефона уже существует. Пожалуйста, используйте другой номер телефона.',
+              'error',
+              'Ошибка уникальности',
+              { phone: 'Этот номер телефона уже используется' }
+            );
+            // Также устанавливаем ошибку в поле формы
+            setUserModal(prev => ({
+              ...prev,
+              fieldErrors: { phone: 'Этот номер телефона уже используется' }
+            }));
+          } else if (responseData.field === 'email') {
+            showError(
+              'Пользователь с таким email уже существует. Пожалуйста, используйте другой адрес электронной почты.',
+              'error',
+              'Ошибка уникальности',
+              { email: 'Этот email уже используется' }
+            );
+            // Также устанавливаем ошибку в поле формы
+            setUserModal(prev => ({
+              ...prev,
+              fieldErrors: { email: 'Этот email уже используется' }
+            }));
           } else {
-            setError(detail);
+            showError(responseData.message || 'Произошла ошибка при сохранении пользователя', 'error', 'Ошибка сохранения');
           }
         }
+        // Обратная совместимость со старым форматом
+        else if (responseData && responseData.message && (responseData.message.includes('номером телефона') || responseData.message.includes('phone'))) {
+          showError(
+            'Пользователь с таким номером телефона уже существует. Пожалуйста, используйте другой номер телефона.',
+            'error',
+            'Ошибка уникальности',
+            { phone: 'Этот номер телефона уже используется' }
+          );
+          // Также устанавливаем ошибку в поле формы
+          setUserModal(prev => ({
+            ...prev,
+            fieldErrors: { phone: 'Этот номер телефона уже используется' }
+          }));
+        } else if (responseData && responseData.message && (responseData.message.includes('email') || responseData.message.includes('почтой'))) {
+          showError(
+            'Пользователь с таким email уже существует. Пожалуйста, используйте другой адрес электронной почты.',
+            'error',
+            'Ошибка уникальности',
+            { email: 'Этот email уже используется' }
+          );
+          // Также устанавливаем ошибку в поле формы
+          setUserModal(prev => ({
+            ...prev,
+            fieldErrors: { email: 'Этот email уже используется' }
+          }));
+        } else {
+          showError(
+            responseData.message || 'Произошла ошибка при сохранении пользователя',
+            'error',
+            'Ошибка сохранения'
+          );
+        }
+      } else if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
+        // Если это массив ошибок валидации
+        const errorMessages = err.response.data.details.map((error: any) => error.message).join(', ');
+
+        // Устанавливаем ошибки в соответствующие поля
+        const fieldErrors: { [key: string]: string } = {};
+        err.response.data.details.forEach((error: any) => {
+          fieldErrors[error.field] = error.message;
+        });
+
+        showError(
+          `Ошибка валидации: ${errorMessages}`,
+          'error',
+          'Ошибка валидации данных',
+          fieldErrors
+        );
+
+        // Также устанавливаем ошибки в поля формы
+        const formFieldErrors: { email?: string; phone?: string } = {};
+        err.response.data.details.forEach((error: any) => {
+          if (error.field === 'email') {
+            formFieldErrors.email = error.message;
+          } else if (error.field === 'phone') {
+            formFieldErrors.phone = error.message;
+          }
+        });
+
+        setUserModal(prev => ({
+          ...prev,
+          fieldErrors: formFieldErrors
+        }));
+      } else if (err.response?.data?.detail) {
+        // Проверяем, не является ли detail названием класса исключения
+        const detail = err.response.data.detail;
+        if (detail.includes('Exception') || detail.includes('Error')) {
+          showError('Произошла ошибка при сохранении пользователя', 'error', 'Ошибка');
+        } else {
+          showError(detail, 'error', 'Ошибка');
+        }
       } else {
-        setError('Ошибка сохранения пользователя');
+        showError('Ошибка сохранения пользователя', 'error', 'Ошибка');
       }
     }
   };
 
   const handleSavePassword = async (passwords: { new: string; confirm: string }) => {
     if (!passwordModal.user) return;
-    
+
     try {
       await apiClient.changePassword(passwordModal.user.id, {
-        new_password: passwords.new
+        new_password: passwords.new,
+        change_password: passwords.confirm
       });
       closePasswordModal();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка смены пароля');
+      showError(err.response?.data?.detail || 'Ошибка смены пароля', 'error', 'Ошибка смены пароля');
     }
   };
 
@@ -210,11 +318,30 @@ export const Dashboard: React.FC = () => {
   };
 
   const closeUserModal = () => {
-    setUserModal({ isOpen: false, mode: 'add', user: null });
+    setUserModal({ isOpen: false, mode: 'add', user: null, fieldErrors: {} });
   };
 
   const closePasswordModal = () => {
     setPasswordModal({ isOpen: false, user: null });
+  };
+
+  const showError = (message: string, type: 'error' | 'warning' | 'info' = 'error', title?: string, fieldErrors?: { [key: string]: string }) => {
+    setErrorModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+      fieldErrors: fieldErrors || {}
+    });
+  };
+
+  const closeErrorModal = () => {
+    setErrorModal({
+      isOpen: false,
+      message: '',
+      type: 'error',
+      fieldErrors: {}
+    });
   };
 
   const handleMenuItemClick = (item: string) => {
@@ -311,7 +438,7 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600">Всего пользователей</p>
                 <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600
                             rounded-xl flex items-center justify-center">
                 <Users className="w-6 h-6 text-white" />
               </div>
@@ -325,7 +452,7 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600">Активных</p>
                 <p className="text-3xl font-bold text-green-600">{stats.active}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 
+              <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600
                             rounded-xl flex items-center justify-center">
                 <UserCheck className="w-6 h-6 text-white" />
               </div>
@@ -339,7 +466,7 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600">Неактивных</p>
                 <p className="text-3xl font-bold text-red-600">{stats.inactive}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600 
+              <div className="w-12 h-12 bg-gradient-to-br from-red-400 to-red-600
                             rounded-xl flex items-center justify-center">
                 <UserX className="w-6 h-6 text-white" />
               </div>
@@ -353,7 +480,7 @@ export const Dashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-600">Администраторов</p>
                 <p className="text-3xl font-bold text-purple-600">{stats.admins}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600
                             rounded-xl flex items-center justify-center">
                 <Users className="w-6 h-6 text-white" />
               </div>
@@ -456,6 +583,7 @@ export const Dashboard: React.FC = () => {
           onSave={handleSaveUser}
           user={userModal.user}
           mode={userModal.mode}
+          fieldErrors={userModal.fieldErrors}
         />
 
         {/* Password Modal */}
@@ -463,8 +591,18 @@ export const Dashboard: React.FC = () => {
           isOpen={passwordModal.isOpen}
           onClose={closePasswordModal}
           onSave={handleSavePassword}
-          userName={passwordModal.user ? 
+          userName={passwordModal.user ?
             `${passwordModal.user.first_name || ''} ${passwordModal.user.last_name || ''}` : ''}
+        />
+
+        {/* Error Modal */}
+        <ErrorModal
+          isOpen={errorModal.isOpen}
+          onClose={closeErrorModal}
+          title={errorModal.title}
+          message={errorModal.message}
+          type={errorModal.type}
+          fieldErrors={errorModal.fieldErrors}
         />
         </div>
       </div>

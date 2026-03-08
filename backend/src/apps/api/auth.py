@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import uuid
-from fastapi import APIRouter, Response, Request, File, UploadFile
+from fastapi import APIRouter, Response, Request, File, UploadFile, Query
 
 from src.apps.api.dependencies import UserIdDep, DBDep, RoleSuperuserDep, RoleAdminDep
 from src.core.exeptions import (
@@ -14,6 +16,11 @@ from src.apps.dto.users import (
     RefreshTokenRequestDTO,
     UserUpdateRequestDTO,
     UserResponseDTO,
+    DeleteResponseDTO,
+    LogoutResponseDTO,
+    RefreshTokenResponseDTO,
+    MinioSetupResponseDTO,
+    ChangePasswordResponseDTO,
 )
 from src.apps.services.auth import AuthService
 from src.apps.middleware.rate_limiting import (
@@ -22,6 +29,7 @@ from src.apps.middleware.rate_limiting import (
     password_reset_rate_limit,
 )
 from src.apps.connectors.minio_client import minio_client
+from src.core.pagination import PaginationParams
 
 
 router = APIRouter(prefix="/auth", tags=["Authorization and authentication"])
@@ -31,8 +39,8 @@ router = APIRouter(prefix="/auth", tags=["Authorization and authentication"])
 @register_rate_limit
 async def register_user(
     request: Request,
-    data: UserRequestAddDTO,
     db: DBDep,
+    data: UserRequestAddDTO,
 ):
     users = await AuthService(db).register_user(data)
     return UserResponseDTO.model_validate(users)
@@ -72,10 +80,13 @@ async def get_users_by_id(
 async def get_all_users(
     role_admin: RoleSuperuserDep,
     db: DBDep,
+    page: int = Query(default=1, ge=1, description="Номер страницы"),
+    size: int = Query(default=20, ge=1, le=100, description="Размер страницы"),
 ):
     if not role_admin:
         raise RolesAdminHTTPException
-    return await AuthService(db).get_all_users()
+    pagination = PaginationParams(page=page, size=size)
+    return await AuthService(db).get_all_users(pagination)
 
 
 @router.delete("/logout", summary="Logout 👨🏽‍💻")
@@ -84,14 +95,12 @@ async def logout_user(
     response: Response,
     db: DBDep,
 ):
-    # Получаем токен из Authorization header или cookies
     access_token = request.cookies.get("access_token")
     if not access_token:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
-            access_token = auth_header[7:]  # Убираем "Bearer "
+            access_token = auth_header[7:]
 
-    # Получаем user_id из токена если он есть
     user_id = None
     if access_token:
         try:
@@ -100,11 +109,8 @@ async def logout_user(
             user_id = payload.get("user_id")
         except InvalidTokenException:
             raise TokenValidationException
-
-    # Выполняем logout с blacklist
     await AuthService(db).logout_user(access_token, user_id)
-
-    return {"message": "Logout success"}
+    return LogoutResponseDTO(message="Logout success")
 
 
 @router.patch("/update/{user_id}", summary="Partial change 👨🏽‍💻")
@@ -141,7 +147,7 @@ async def delete_user(user_id: uuid.UUID, role_admin: RoleSuperuserDep, db: DBDe
     if not role_admin:
         raise RolesAdminHTTPException
     await AuthService(db).delete_user(user_id)
-    return {"message": "User deleted"}
+    return DeleteResponseDTO(message="User deleted")
 
 
 @router.put("/change_password/{user_id}", summary="Password reset")
@@ -156,7 +162,7 @@ async def change_password(
     if not role_admin:
         raise RolesAdminHTTPException
     await AuthService(db).change_password(user_id, data)
-    return {"message": "Password successfully changed"}
+    return ChangePasswordResponseDTO(message="Password successfully changed")
 
 
 @router.post("/setup_minio", summary="Setup MinIO bucket public access")
@@ -166,7 +172,7 @@ async def setup_minio_public_access(role_admin: RoleSuperuserDep):
         raise RolesAdminHTTPException
 
     minio_client.make_bucket_public()
-    return {"message": "MinIO bucket configured for public access"}
+    return MinioSetupResponseDTO(message="MinIO bucket configured for public access")
 
 
 @router.post("/refresh", summary="Refresh access_token using refresh_token")
@@ -177,8 +183,8 @@ async def refresh_access_token(
     db: DBDep,
 ):
     refresh_token = request.cookies.get("refresh_token")
-    result = await AuthService(db).refresh_access_token(refresh_token, response)
-    return {
-        "status": "Token updated",
-        "access_token": result["access_token"],
-    }
+    access_token = await AuthService(db).refresh_access_token(refresh_token, response)
+    return RefreshTokenResponseDTO(
+        status="Token updated",
+        access_token=access_token,
+    )
